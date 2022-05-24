@@ -1,65 +1,198 @@
 ﻿// See https://aka.ms/new-console-template for more information
 using System.Linq;
+using System.Text;
+using Alba.CsConsoleFormat;
+using Alba.CsConsoleFormat.Fluent;
 
-Console.WriteLine("Hello, World!");
+public class Program{
 
-var prov = new SimpleCSVProvider(new FileInfo("./Database/Dictionary.txt"));
-
-await prov.Load();
-
-string target = "GLaDOS";
-
-
-target = target.ToLower();
-
-var filtered = prov.GetWords().AsParallel()
-    .Where(w => w.ToLower().ContainsAny(target))
-    .Select(w=>w.ToLower())
-    .SelectMany((w,h) =>
+    static LineThickness headerThickness = new LineThickness(LineWidth.Double, LineWidth.Single);
+    
+    public static async Task Main()
     {
-        var res = new List<Result>();
-        for (int i = 0; i < target.Length; i++)
+        
+
+        //Load the dictionary
+        var prov = new SimpleCsvProvider(new FileInfo("./Database/Dictionary.txt"));
+        await prov.Load();
+     
+        string target = "GLaDOS";
+        target = target.ToLower();
+        Console.WriteLine($"Target: {target}");
+
+        var substitutions = getSubstitutions(prov, target);
+
+        var perms = getPermutations(substitutions, target);
+
+        
+        
+        foreach (var perm in perms)
         {
-            for (int j = i; j < target.Length; j++)
+            Display(perm);
+        }
+    }
+
+    public static List<Substitution> getSubstitutions(IWordProvider prov, string target)
+    {
+        var filtered = prov.GetWords().AsParallel()
+            .Where(w => w.ToLower().ContainsAny(target))
+            .Select(w=>w.ToLower())
+            .SelectMany((w,h) =>
             {
-                var substring = target.Substring(i, j - i + 1);
-
-                int minIndex = w.IndexOf(substring);
-                while (minIndex != -1)
+                var res = new List<Result>();
+                for (int i = 0; i < target.Length; i++)
                 {
-
-                    res.Add(new Result()
+                    for (int j = i; j < target.Length; j++)
                     {
-                        word = w,
-                        score = 1000-minIndex,
-                        targetLetters = new Range(i, j + 1),
-                        sourceLetters = new Range(minIndex, minIndex + substring.Length)
-                    });
+                        var substring = target.Substring(i, j - i + 1);
 
-                    minIndex = w.IndexOf(substring, minIndex + substring.Length);
+                        int minIndex = w.IndexOf(substring);
+                        while (minIndex != -1)
+                        {
+
+                            res.Add(new Result()
+                            {
+                                word = w,
+                                score = 1 - (minIndex / (float)w.Length),
+                                targetLetters = new Range(i, j + 1),
+                                sourceLetters = new Range(minIndex, minIndex + substring.Length)
+                            });
+
+                            minIndex = w.IndexOf(substring, minIndex + substring.Length);
+                        }
+                    }
                 }
+
+                return res;
+            })
+            .Where(r => !(r.word.Length <= 4 && r.sourceLetters.Start.Value > 0))
+            .Where(r=> r.score > 0.5);
+
+
+        var sorted = filtered
+            .OrderByDescending(r => r.score)
+            .GroupBy(r => r.targetLetters)
+            .OrderBy(r=>r.Key.Start.Value)
+            .Select(g =>
+            {
+                return new Substitution()
+                {
+                    target = g.Key,
+                    options = g.ToList()
+                };
+            })
+            .ToList();
+        
+        
+        
+        return sorted; 
+    }
+
+    static List<Permutation> getPermutations(List<Substitution> substitutions,string target)
+    {
+        List<Permutation> perms = new();
+
+        Stack<Substitution> stack = new();
+        foreach (var root in substitutions.Where(s => s.target.Start.Value == 0))
+        {
+            traverse(root);
+        }
+
+        void traverse(Substitution current)
+        {
+            stack.Push(current);
+            
+            if (current.target.End.Value == target.Length)
+            {
+                var a = new Permutation()
+                {
+                    //targetRanges = targets,
+                    substitutions = stack.Reverse().ToList()
+                };
+                perms.Add(a);
+                    
+            }
+            
+            var neighbours = substitutions
+                .Where(s => s.target.Start.Value == current.target.End.Value);
+
+            foreach (var neighbour in neighbours)
+            {
+                traverse(neighbour);
+            }
+
+            stack.Pop();
+        }
+
+        return perms;
+    }
+    
+    static void Display(Permutation perm)
+    {
+        var height = perm.substitutions.Max(s => s.options.Count);
+    
+        Element[,] display = new Element[perm.substitutions.Count, height];
+
+        for (int i = 0; i < perm.substitutions.Count; i++)
+        {
+            var sub = perm.substitutions[i];
+        
+            for (int j = 0; j < sub.options.Count; j++)
+            {
+                var opt = sub.options[j];
+
+                Div collection = new(null);
+
+                collection.Children.Add( new Span($"{opt.score:P1} \t {opt.word[..opt.sourceLetters.Start]}"));
+            
+                collection.Children.Add($"{opt.word[opt.sourceLetters]}".Red());
+
+                collection.Children.Add( new Span($"{opt.word[opt.sourceLetters.End..]} \n"));
+
+                display[i, j] = collection;
+
             }
         }
 
-        return res;
-    });
-
-
-var sorted = filtered
-    .OrderByDescending(r => r.score)
-    .GroupBy(r => r.targetLetters)
-    .OrderBy(r=>r.Key.Start.Value)
-    .Select(g =>
-    {
-        return new Substitution()
+        List<List<Element>> a = new();
+        for (int y = 0; y < display.GetLength(1); y++)
         {
-            target = g.Key,
-            options = g.ToList()
-        };
-    })
-    .ToList();
+            List<Element> b = new();
+            for (int x = 0; x < display.GetLength(0); x++)
+            {
+                b.Add(display[x,y]);
+            }
+            a.Add(b);
+        }
+    
+        var doc = new Document(
+            new Span("Order #") { Color = ConsoleColor.Yellow }, "asd", "\n",
+            new Span("Customer: ") { Color = ConsoleColor.Yellow }, "asd",
+            new Grid {
+                Color = ConsoleColor.Gray,
+                Columns = {Enumerable.Range(0,perm.substitutions.Count).Select(i=>GridLength.Star(1))},
+                Children = {
+                    a.Select(item => item.Select(i => new Cell(i)))
+                }
+            }
+        );
+
+        
+        ConsoleRenderer.RenderDocument(doc);
+    }
+}
 
 
+
+
+
+
+
+
+
+
+
+/*
 List<Permutation> something = new();
 
 func(0, new List<Substitution>());
@@ -105,6 +238,11 @@ List<Substitution> func(int progress, List<Substitution> list)
 }
 
 
+
+
+
+
+
 foreach (var option in something)
 {
     foreach (var range in option.targetRanges)
@@ -113,26 +251,9 @@ foreach (var option in something)
     }
     Console.WriteLine();
     
-    foreach (var substitution in option.substitutions)
-    {
-        Console.WriteLine(target[substitution.target]);
-        foreach (var opt in substitution.options)
-        {
-            Console.Write($"{opt.score} \t {opt.word[..opt.sourceLetters.Start]}");
-        
-            Console.BackgroundColor = ConsoleColor.Red;
-            Console.ForegroundColor = ConsoleColor.Black;
-            Console.Write($"{opt.word[opt.sourceLetters]}");
-            Console.BackgroundColor = ConsoleColor.Black;
-            Console.ForegroundColor = ConsoleColor.White;
-        
-            Console.Write($"{opt.word[opt.sourceLetters.End..]} \n");    
-        }
-        
-    }
+    Display(option);
 }
-
-
+*/
 /*
 foreach(var w in sorted){
     //Console.WriteLine(target.SubstringFromTo(w.Key.Start.Value,w.Key.End.Value));
@@ -153,88 +274,3 @@ foreach(var w in sorted){
     
 }
 */
-
-class Permutation
-{
-    public List<Range> targetRanges;
-    public List<Substitution> substitutions;
-}
-
-class Substitution
-{
-    public Range target;
-    public List<Result> options;
-}
-
-struct Result
-{
-    public Range targetLetters;
-    public Range sourceLetters;
-    public string word;
-    public float score;
-}
-
-
-interface IWordProvider
-{
-    IEnumerable<string> GetWords();
-}
-
-class SimpleCSVProvider : IWordProvider
-{
-    private readonly FileInfo _csvFile;
-
-    private List<string> words = new ();
-
-    public SimpleCSVProvider(FileInfo csvFile)
-    {
-        _csvFile = csvFile;
-    }
-
-    public async Task Load()
-    {
-        StreamReader reader = new StreamReader(_csvFile.FullName);
-
-        while (!reader.EndOfStream)
-        {
-            var a = await reader.ReadLineAsync();
-            if(a is not null)
-                words.Add(a);
-        }
-        
-    }
-    
-    public IEnumerable<string> GetWords()
-    {
-        return words;
-    }
-}
-
-static class StringExtensions
-{
-    public static bool ContainsAny(this string str, string chars)
-    {
-        return str.ContainsAny(chars.ToCharArray());
-    }
-    
-    public static bool ContainsAny(this string str, char[] chars)
-    {
-        return str.IndexOfAny(chars) != -1;
-    }
-
-    public static string SubstringFromTo(this string str, int from, int to)
-    {
-        return str.Substring(from, to - from + 1);
-    }
-    
-    public static string[] Substrings(this string str)
-    {
-        var stringList = new List<string>();
-        for (int i=0; i <str.Length; i++)
-        for (int j=i; j <str.Length; j++)
-            stringList.Add(str.Substring(i,j-i+1));
-
-        return stringList.ToArray();
-    }
-    
-}
