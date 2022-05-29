@@ -15,28 +15,34 @@ public class Program{
         //Load the dictionary
         var prov = new SimpleCsvProvider(new FileInfo("./Database/Dictionary.txt"));
         await prov.Load();
-     
+
+        var bigProv = new WordNetProvider();
+
+
+        var filter = new SysnoymFilter(new List<string>(new[] { "science" }));
+        
+        
+        
         string target = "GLaDOS";
         target = target.ToLower();
         Console.WriteLine($"Target: {target}");
 
-        var substitutions = getSubstitutions(prov, target);
+        var substitutions = getSubstitutions(bigProv, target,filter);
 
         var perms = getPermutations(substitutions, target);
-
         
         
         foreach (var perm in perms)
         {
-            Display(perm);
+            Display(perm, target);
         }
     }
 
-    public static List<Substitution> getSubstitutions(IWordProvider prov, string target)
+    public static List<Substitution> getSubstitutions(IWordProvider prov, string target, IWordFilter filter)
     {
         var filtered = prov.GetWords().AsParallel()
-            .Where(w => w.ToLower().ContainsAny(target))
-            .Select(w=>w.ToLower())
+            .Where(w => w.word.ToLower().ContainsAny(target))
+            .Where(w=>filter.filter(w))
             .SelectMany((w,h) =>
             {
                 var res = new List<Result>();
@@ -46,27 +52,37 @@ public class Program{
                     {
                         var substring = target.Substring(i, j - i + 1);
 
-                        int minIndex = w.IndexOf(substring);
+                        int minIndex = w.word.IndexOf(substring);
                         while (minIndex != -1)
                         {
 
                             res.Add(new Result()
                             {
                                 word = w,
-                                score = 1 - (minIndex / (float)w.Length),
+                                score = 1 - (minIndex / (float)w.word.Length),
                                 targetLetters = new Range(i, j + 1),
                                 sourceLetters = new Range(minIndex, minIndex + substring.Length)
                             });
 
-                            minIndex = w.IndexOf(substring, minIndex + substring.Length);
+                            minIndex = w.word.IndexOf(substring, minIndex + substring.Length);
                         }
                     }
                 }
 
                 return res;
             })
-            .Where(r => !(r.word.Length <= 4 && r.sourceLetters.Start.Value > 0))
-            .Where(r=> r.score > 0.5);
+            .Where(r => !(r.word.word.Length <= 4 && r.sourceLetters.Start.Value > 0))
+            .Where(r=> r.score > 0.5)
+            .Where(r =>
+            {
+                var tar = target[r.targetLetters];
+                if (tar.IsAllLower() && r.sourceLetters.Start.Value == 0)
+                {
+                    return true;
+                }
+                
+                return false;
+            });
 
 
         var sorted = filtered
@@ -127,7 +143,7 @@ public class Program{
         return perms;
     }
     
-    static void Display(Permutation perm)
+    static void Display(Permutation perm, string target)
     {
         var height = perm.substitutions.Max(s => s.options.Count);
     
@@ -143,11 +159,9 @@ public class Program{
 
                 Div collection = new(null);
 
-                collection.Children.Add( new Span($"{opt.score:P1} \t {opt.word[..opt.sourceLetters.Start]}"));
-            
-                collection.Children.Add($"{opt.word[opt.sourceLetters]}".Red());
-
-                collection.Children.Add( new Span($"{opt.word[opt.sourceLetters.End..]} \n"));
+                collection.Children.Add(new Span($"{opt.score:P1} \t {opt.word.word[..opt.sourceLetters.Start]}"));
+                collection.Children.Add($"{opt.word.word[opt.sourceLetters]}".Red());
+                collection.Children.Add( new Span($"{opt.word.word[opt.sourceLetters.End..]} \n"));
 
                 display[i, j] = collection;
 
@@ -166,8 +180,8 @@ public class Program{
         }
     
         var doc = new Document(
-            new Span("Order #") { Color = ConsoleColor.Yellow }, "asd", "\n",
-            new Span("Customer: ") { Color = ConsoleColor.Yellow }, "asd",
+            new Span("Target: ") { Color = ConsoleColor.Yellow }, target, "\n",
+            new Span("Split: ") { Color = ConsoleColor.Yellow }, perm.substitutions.Select(s=>target[s.target]).Aggregate((a,c)=>a+" "+c),
             new Grid {
                 Color = ConsoleColor.Gray,
                 Columns = {Enumerable.Range(0,perm.substitutions.Count).Select(i=>GridLength.Star(1))},
@@ -178,18 +192,11 @@ public class Program{
         );
 
         
-        ConsoleRenderer.RenderDocument(doc);
+        //ConsoleRenderer.RenderDocumentToBuffer(doc,new ConsoleBuffer(Console.BufferWidth));
+        
+        ConsoleRenderer.RenderDocument(doc, renderRect: new Rect(new Size(200,2000)));
     }
 }
-
-
-
-
-
-
-
-
-
 
 
 /*

@@ -1,4 +1,6 @@
-﻿class SimpleCsvProvider : IWordProvider
+﻿using Namer;
+
+class SimpleCsvProvider : IWordProvider
 {
     private readonly FileInfo _csvFile;
 
@@ -22,8 +24,11 @@
         
     }
     
-    public IEnumerable<string> GetWords()
+    public IEnumerable<Word> GetWords()
     {
-        return words;
+        return words.Select(s=>new Word()
+        {
+            word = s
+        });
     }
 }

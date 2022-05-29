@@ -1,7 +1,9 @@
-﻿public struct Result
+﻿using Namer;
+
+public struct Result
 {
     public Range targetLetters;
     public Range sourceLetters;
-    public string word;
+    public Word word;
     public float score;
 }

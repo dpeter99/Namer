@@ -1,4 +1,6 @@
-﻿public interface IWordProvider
+﻿using Namer;
+
+public interface IWordProvider
 {
-    IEnumerable<string> GetWords();
+    IEnumerable<Word> GetWords();
 }

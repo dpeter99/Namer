@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Namer", "Namer\Namer.csproj", "{022BF67D-02FB-447F-B5CA-AEB50DDABE6D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WordNetSharp", "WordNetSharp\WordNetSharp.csproj", "{F4C6C48C-90EF-445D-B8F8-AD9B6767D9A8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{022BF67D-02FB-447F-B5CA-AEB50DDABE6D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{022BF67D-02FB-447F-B5CA-AEB50DDABE6D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{022BF67D-02FB-447F-B5CA-AEB50DDABE6D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F4C6C48C-90EF-445D-B8F8-AD9B6767D9A8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F4C6C48C-90EF-445D-B8F8-AD9B6767D9A8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F4C6C48C-90EF-445D-B8F8-AD9B6767D9A8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F4C6C48C-90EF-445D-B8F8-AD9B6767D9A8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
